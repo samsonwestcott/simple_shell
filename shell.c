@@ -1,9 +1,9 @@
 #include "builtins.h"
 #include "csapp.h"
-#include "jobs.h"
+#include "tasks.h"
 
 #define MAXARGS 128
-#define MAX_BG_JOBS 69105
+#define MAX_BG_taskS 69105
 
 void eval(char *cmdline);
 int parseline(char *buf, int *argc, char **argv);
@@ -30,8 +30,8 @@ int main()
         /* Evaluate */
         eval(cmdline);
 
-        /* Update job statuses */
-        update_jobs();
+        /* Update task statuses */
+        update_tasks();
     }
 }
 
@@ -46,9 +46,9 @@ void eval(char *cmdline)
     int argc;            /* argument count */
     char *argv[MAXARGS]; /* Argument list execve() */
     char modified_cmdline[MAXLINE];   /* Holds modified command line */
-    int bg;              /* Should the job run in bg or fg? */
+    int bg;              /* Should the task run in bg or fg? */
 
-    static unsigned jid = 0; /* job id */
+    static unsigned jid = 0; /* task id */
 
     strcpy(modified_cmdline, cmdline);
 
@@ -65,7 +65,7 @@ void eval(char *cmdline)
 
     jid++;
 
-    if ((cpid = Fork()) == 0) {   /* Child runs user job */
+    if ((cpid = Fork()) == 0) {   /* Child runs user task */
         setpgid(getpid(), 0);
         if (execve(argv[0], argv, environ) < 0) {
             printf("%s: Command not found.\n", argv[0]);
@@ -73,11 +73,11 @@ void eval(char *cmdline)
         }
     } 
 
-    Job *j = make_job(jid, cpid, cmdline); 
+    task *j = make_task(jid, cpid, cmdline); 
 
-    /* Parent waits for foreground job to terminate */
+    /* Parent waits for foreground task to terminate */
     if (!bg)
-        wait_for_job(j);
+        wait_for_task(j);
     else
         printf("[%d] %d   %s", j->jid, j->pid, j->cmdline);
 
@@ -87,18 +87,18 @@ void eval(char *cmdline)
     return;
 }
 
-void wait_for_job(Job *j) {
+void wait_for_task(task *j) {
     int status;
     if (waitpid(j->pid, &status, WUNTRACED) > 0) {
         if (WIFSTOPPED(status)) {
             j->stopped = 1;
-            printf(" Job %d stopped by signal: %d\n", j->pid, WSTOPSIG(status));
+            printf(" task %d stopped by signal: %d\n", j->pid, WSTOPSIG(status));
         } else {
-            remove_job(j);
+            remove_task(j);
             if (WIFSIGNALED(status))
-                printf(" Job %d terminated by signal: %s\n", j->pid, strsignal(WTERMSIG(status)));
+                printf(" task %d terminated by signal: %s\n", j->pid, strsignal(WTERMSIG(status)));
             else if (!WIFEXITED(status))
-                printf(" Job %d did not exit with a valid status\n", j->pid);
+                printf(" task %d did not exit with a valid status\n", j->pid);
         }
     }
     else
@@ -110,7 +110,7 @@ int parseline(char *buf, int *arg_count, char **argv)
 {
     char *delim;         /* Points to first space delimiter */
     int argc;            /* Number of args */
-    int bg;              /* Background job? */
+    int bg;              /* Background task? */
 
     buf[strlen(buf)-1] = ' ';  /* Replace trailing '\n' with space */
     while (*buf && (*buf == ' ')) /* Ignore leading spaces */
@@ -130,7 +130,7 @@ int parseline(char *buf, int *arg_count, char **argv)
     if (argc == 0)  /* Ignore blank line */
         return 1;
 
-    /* Should the job run in the background? */
+    /* Should the task run in the background? */
     if ((bg = (*argv[argc-1] == '&')) != 0)
         argv[--argc] = NULL;
 
